@@ -57,6 +57,27 @@ const App: React.FC = () => {
     }
   }, [platform, handle]);
 
+  const handleRegenerateForPlatform = useCallback(async (newPlatform: Platform) => {
+    if (!handle || !topic) return;
+
+    setPlatform(newPlatform);
+    setIsLoading(true);
+    setError(null);
+    setStep(AppStep.GENERATING);
+
+    try {
+        const results = await generateSocialMediaContent(newPlatform, handle, topic);
+        setSuggestions(results);
+        setStep(AppStep.SHOW_RESULTS);
+    } catch (err) {
+        console.error(err);
+        setError('Sorry, something went wrong while generating content. Please try again.');
+        setStep(AppStep.ENTER_TOPIC);
+    } finally {
+        setIsLoading(false);
+    }
+  }, [handle, topic]);
+
   const handleReset = () => {
     setStep(AppStep.SELECT_PLATFORM);
     setPlatform(null);
@@ -79,7 +100,7 @@ const App: React.FC = () => {
       case AppStep.GENERATING:
         return <LoadingSpinner />;
       case AppStep.SHOW_RESULTS:
-        return <ResultsDisplay suggestions={suggestions} onReset={handleReset} platform={platform!} handle={handle} topic={topic} />;
+        return <ResultsDisplay suggestions={suggestions} onReset={handleReset} platform={platform!} handle={handle} topic={topic} onRegenerate={handleRegenerateForPlatform} />;
       default:
         return <div>Invalid step</div>;
     }

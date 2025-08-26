@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { PostSuggestion, Platform } from '../types';
+import InstagramIcon from './icons/InstagramIcon';
+import TwitterIcon from './icons/TwitterIcon';
+import FacebookIcon from './icons/FacebookIcon';
+import LinkedInIcon from './icons/LinkedInIcon';
+import TikTokIcon from './icons/TikTokIcon';
+import LightbulbIcon from './icons/LightbulbIcon';
+
 
 interface ResultsDisplayProps {
   suggestions: PostSuggestion[];
@@ -7,9 +14,27 @@ interface ResultsDisplayProps {
   platform: Platform;
   handle: string;
   topic: string;
+  onRegenerate: (platform: Platform) => void;
 }
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, platform, handle, topic }) => {
+const platforms = [
+  { name: Platform.Instagram, icon: <InstagramIcon />, color: "text-[#E1306C]" },
+  { name: Platform.Twitter, icon: <TwitterIcon />, color: "text-[#1DA1F2]" },
+  { name: Platform.Facebook, icon: <FacebookIcon />, color: "text-[#4267B2]" },
+  { name: Platform.LinkedIn, icon: <LinkedInIcon />, color: "text-[#0077B5]" },
+  { name: Platform.TikTok, icon: <TikTokIcon />, color: "text-[#000000]" },
+];
+
+const postingTips: { [key in Platform]: string } = {
+    [Platform.Instagram]: "For Reels, use trending audio and aim for quick cuts. For feed posts, a high-quality image is crucial. Post Stories for behind-the-scenes content.",
+    [Platform.Twitter]: "Engage in conversations and use relevant hashtags sparingly. Posting threads can be a great way to share more detailed information.",
+    [Platform.Facebook]: "Videos (especially Live) get high engagement. Encourage comments by asking questions to your audience.",
+    [Platform.LinkedIn]: "Tag relevant companies or people. The best times to post are typically during business hours on weekdays.",
+    [Platform.TikTok]: "Post consistently and hop on trends quickly. The first 3 seconds of your video are the most important to capture attention.",
+};
+
+
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, platform, handle, topic, onRegenerate }) => {
     const [editableSuggestions, setEditableSuggestions] = useState<PostSuggestion[]>([]);
     const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
@@ -79,6 +104,32 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
                     Generated for <span className="font-semibold text-brand-primary">{handle}</span> on <span className="font-semibold text-brand-primary">{platform}</span> about "{topic}"
                 </p>
             </header>
+            
+            <div className="mb-8 p-4 bg-gray-50/80 rounded-lg border border-gray-200">
+                <p className="text-center text-sm font-medium text-gray-700 mb-3">Or, generate ideas for another platform:</p>
+                <div className="flex justify-center items-center gap-4">
+                    {platforms.map(p => (
+                        <button
+                            key={p.name}
+                            onClick={() => onRegenerate(p.name)}
+                            disabled={p.name === platform}
+                            className={`w-10 h-10 p-2 rounded-full transition-all duration-300 ${p.name === platform ? 'bg-brand-primary/20 ring-2 ring-brand-primary cursor-default' : 'bg-white hover:bg-gray-100 hover:scale-110 border border-gray-300'}`}
+                            aria-label={`Regenerate content for ${p.name}`}
+                        >
+                            <span className={p.color}>{p.icon}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+            
+            <div className="flex items-start gap-3 bg-blue-50/70 border border-blue-200 text-blue-800 p-4 rounded-lg mb-8 text-sm">
+                <LightbulbIcon />
+                <div>
+                    <h4 className="font-bold mb-1">{platform} Best Practices</h4>
+                    <p>{postingTips[platform]}</p>
+                </div>
+            </div>
+
 
             <div className="space-y-8">
                 {editableSuggestions.map((suggestion, index) => {

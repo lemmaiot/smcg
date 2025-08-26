@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Platform } from '../types';
+import LightbulbIcon from './icons/LightbulbIcon';
 
 interface TopicInputProps {
   platform: Platform;
@@ -8,6 +9,15 @@ interface TopicInputProps {
   onBack: () => void;
   error: string | null;
 }
+
+const platformTips: { [key in Platform]: string } = {
+    [Platform.Instagram]: "Focus on high-quality visuals. Ideas for Reels with trending audio often perform best.",
+    [Platform.Twitter]: "Keep it concise and punchy. Asking questions or posting hot takes can drive engagement.",
+    [Platform.Facebook]: "Aim for community-building content. Longer posts, questions, and links to articles work well.",
+    [Platform.LinkedIn]: "Maintain a professional tone. Share industry insights, career advice, or company news.",
+    [Platform.TikTok]: "Authenticity is key. Short, engaging videos with popular sounds or effects grab attention quickly.",
+};
+
 
 const TopicInput: React.FC<TopicInputProps> = ({ platform, handle, onSubmit, onBack, error }) => {
   const [topic, setTopic] = useState('');
@@ -24,8 +34,12 @@ const TopicInput: React.FC<TopicInputProps> = ({ platform, handle, onSubmit, onB
       <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">Step 3: Define Your Topic</h2>
       <p className="text-center text-gray-600 mb-8">What would you like the new post for <span className="font-bold text-brand-primary">{handle}</span> to be about?</p>
       
-      <div className="bg-gray-50/50 p-3 rounded-md mb-6 text-sm text-center border border-gray-200">
-        <p className="text-gray-600">Generating content for <span className="font-semibold text-gray-800">{platform}</span></p>
+      <div className="flex items-start gap-3 bg-blue-50/70 border border-blue-200 text-blue-800 p-4 rounded-lg mb-6 text-sm">
+        <LightbulbIcon />
+        <div>
+          <h4 className="font-bold mb-1">{platform} Tip</h4>
+          <p>{platformTips[platform]}</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
