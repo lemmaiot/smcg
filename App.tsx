@@ -6,7 +6,7 @@ import HandleConfirmation from './components/HandleConfirmation';
 import TopicInput from './components/TopicInput';
 import LoadingSpinner from './components/LoadingSpinner';
 import ResultsDisplay from './components/ResultsDisplay';
-import { generateSocialMediaContent } from './services/geminiService';
+import { generateSocialMediaContent, generateNextPostIdeas } from './services/geminiService';
 import SparklesIcon from './components/icons/SparklesIcon';
 import BrandLogo from './components/BrandLogo';
 
@@ -16,7 +16,9 @@ const App: React.FC = () => {
   const [handle, setHandle] = useState<string>('');
   const [topic, setTopic] = useState<string>('');
   const [suggestions, setSuggestions] = useState<PostSuggestion[]>([]);
+  const [nextSteps, setNextSteps] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isGeneratingNextSteps, setIsGeneratingNextSteps] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const handlePlatformSelect = (selectedPlatform: Platform) => {
@@ -42,17 +44,32 @@ const App: React.FC = () => {
     setTopic(postTopic);
     setIsLoading(true);
     setError(null);
+    setSuggestions([]);
+    setNextSteps([]);
     setStep(AppStep.GENERATING);
 
     try {
       const results = await generateSocialMediaContent(platform, handle, postTopic);
       setSuggestions(results);
       setStep(AppStep.SHOW_RESULTS);
+      setIsLoading(false); // Main content is loaded
+
+      // Fetch next steps in the background
+      setIsGeneratingNextSteps(true);
+      try {
+        const nextStepIdeas = await generateNextPostIdeas(platform, handle, postTopic);
+        setNextSteps(nextStepIdeas);
+      } catch (nextStepError) {
+        console.error("Could not generate next step ideas:", nextStepError);
+        setNextSteps([]); // Fail gracefully
+      } finally {
+        setIsGeneratingNextSteps(false);
+      }
+
     } catch (err) {
       console.error(err);
       setError('Sorry, something went wrong while generating content. Please try again.');
       setStep(AppStep.ENTER_TOPIC); // Revert to topic input on error
-    } finally {
       setIsLoading(false);
     }
   }, [platform, handle]);
@@ -63,17 +80,31 @@ const App: React.FC = () => {
     setPlatform(newPlatform);
     setIsLoading(true);
     setError(null);
+    setSuggestions([]);
+    setNextSteps([]);
     setStep(AppStep.GENERATING);
 
     try {
         const results = await generateSocialMediaContent(newPlatform, handle, topic);
         setSuggestions(results);
         setStep(AppStep.SHOW_RESULTS);
+        setIsLoading(false); // Main content is loaded
+
+        // Fetch next steps in the background
+        setIsGeneratingNextSteps(true);
+        try {
+            const nextStepIdeas = await generateNextPostIdeas(newPlatform, handle, topic);
+            setNextSteps(nextStepIdeas);
+        } catch (nextStepError) {
+            console.error("Could not generate next step ideas:", nextStepError);
+            setNextSteps([]);
+        } finally {
+            setIsGeneratingNextSteps(false);
+        }
     } catch (err) {
         console.error(err);
         setError('Sorry, something went wrong while generating content. Please try again.');
         setStep(AppStep.ENTER_TOPIC);
-    } finally {
         setIsLoading(false);
     }
   }, [handle, topic]);
@@ -84,6 +115,7 @@ const App: React.FC = () => {
     setHandle('');
     setTopic('');
     setSuggestions([]);
+    setNextSteps([]);
     setError(null);
   };
   
@@ -100,7 +132,16 @@ const App: React.FC = () => {
       case AppStep.GENERATING:
         return <LoadingSpinner />;
       case AppStep.SHOW_RESULTS:
-        return <ResultsDisplay suggestions={suggestions} onReset={handleReset} platform={platform!} handle={handle} topic={topic} onRegenerate={handleRegenerateForPlatform} />;
+        return <ResultsDisplay 
+                  suggestions={suggestions} 
+                  onReset={handleReset} 
+                  platform={platform!} 
+                  handle={handle} 
+                  topic={topic} 
+                  onRegenerate={handleRegenerateForPlatform}
+                  nextSteps={nextSteps}
+                  isGeneratingNextSteps={isGeneratingNextSteps}
+               />;
       default:
         return <div>Invalid step</div>;
     }
@@ -121,7 +162,7 @@ const App: React.FC = () => {
             {renderStep()}
         </main>
         <footer className="text-center mt-8 text-gray-500 text-sm">
-          <p>Powered by Gemini API</p>
+          <p>Product of <a href="https://lemmaiot.com.ng" target="_blank" rel="noopener noreferrer" className="font-semibold text-brand-primary hover:underline">LemmaIoT</a></p>
         </footer>
        </div>
     </div>

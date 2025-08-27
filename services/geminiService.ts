@@ -28,6 +28,21 @@ const responseSchema = {
   }
 };
 
+const nextStepsSchema = {
+    type: Type.OBJECT,
+    properties: {
+        nextSteps: {
+            type: Type.ARRAY,
+            description: "An array of 3-5 distinct, actionable, and creative ideas for future social media posts that logically follow the current topic.",
+            items: {
+                type: Type.STRING
+            }
+        }
+    },
+    required: ["nextSteps"]
+};
+
+
 export async function generateSocialMediaContent(
   platform: Platform,
   handle: string,
@@ -69,4 +84,53 @@ export async function generateSocialMediaContent(
     console.error("Error generating content with Gemini API:", error);
     throw new Error("Failed to generate social media content.");
   }
+}
+
+
+export async function generateNextPostIdeas(
+    platform: Platform,
+    handle: string,
+    topic: string
+): Promise<string[]> {
+    const prompt = `
+        Act as a senior social media content strategist. Based on a user's recent post, your task is to suggest a series of 3-5 follow-up post ideas to create a content pipeline.
+
+        **User Information & Current Post Context:**
+        - Platform: ${platform}
+        - Handle: ${handle}
+        - Original Post Topic: "${topic}"
+
+        **Instructions:**
+        1.  **Analyze the Topic:** Consider the core message and potential audience questions or interests related to "${topic}".
+        2.  **Brainstorm Follow-ups:** Generate 3 to 5 distinct ideas for the *next* posts. These should build upon the original topic, not just repeat it. Think about creating a mini-series, diving deeper into a specific aspect, showing behind-the-scenes content, or addressing potential customer feedback.
+        3.  **Keep it Actionable:** Each idea should be a concise, clear concept for a post. For example: "A 'before and after' Reel showing the impact of the new app feature" or "A LinkedIn article detailing the research behind the app's development."
+        4.  **Tailor to Platform:** Ensure the ideas are suitable for ${platform}.
+        5.  **Format:** Return the output as a JSON object containing a "nextSteps" array of strings.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: nextStepsSchema,
+                temperature: 0.7,
+            },
+        });
+        
+        const jsonText = response.text.trim();
+        const result = JSON.parse(jsonText);
+
+        if (result && Array.isArray(result.nextSteps)) {
+            return result.nextSteps;
+        } else {
+            console.error("Invalid format for next steps response:", result);
+            return [];
+        }
+
+    } catch (error) {
+        console.error("Error generating next post ideas with Gemini API:", error);
+        throw new Error("Failed to generate next post ideas.");
+    }
 }

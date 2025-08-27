@@ -6,6 +6,7 @@ import FacebookIcon from './icons/FacebookIcon';
 import LinkedInIcon from './icons/LinkedInIcon';
 import TikTokIcon from './icons/TikTokIcon';
 import LightbulbIcon from './icons/LightbulbIcon';
+import TrendingUpIcon from './icons/TrendingUpIcon';
 
 
 interface ResultsDisplayProps {
@@ -15,14 +16,16 @@ interface ResultsDisplayProps {
   handle: string;
   topic: string;
   onRegenerate: (platform: Platform) => void;
+  nextSteps: string[];
+  isGeneratingNextSteps: boolean;
 }
 
 const platforms = [
-  { name: Platform.Instagram, icon: <InstagramIcon />, color: "text-[#E1306C]" },
-  { name: Platform.Twitter, icon: <TwitterIcon />, color: "text-[#1DA1F2]" },
-  { name: Platform.Facebook, icon: <FacebookIcon />, color: "text-[#4267B2]" },
-  { name: Platform.LinkedIn, icon: <LinkedInIcon />, color: "text-[#0077B5]" },
-  { name: Platform.TikTok, icon: <TikTokIcon />, color: "text-[#000000]" },
+  { name: Platform.Instagram, icon: <InstagramIcon />, color: "text-[#E1306C]", hoverColor: "hover:border-[#E1306C]" },
+  { name: Platform.Twitter, icon: <TwitterIcon />, color: "text-[#1DA1F2]", hoverColor: "hover:border-[#1DA1F2]" },
+  { name: Platform.Facebook, icon: <FacebookIcon />, color: "text-[#4267B2]", hoverColor: "hover:border-[#4267B2]" },
+  { name: Platform.LinkedIn, icon: <LinkedInIcon />, color: "text-[#0077B5]", hoverColor: "hover:border-[#0077B5]" },
+  { name: Platform.TikTok, icon: <TikTokIcon />, color: "text-[#000000]", hoverColor: "hover:border-[#000000]" },
 ];
 
 const postingTips: { [key in Platform]: string } = {
@@ -34,9 +37,8 @@ const postingTips: { [key in Platform]: string } = {
 };
 
 
-const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, platform, handle, topic, onRegenerate }) => {
+const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, platform, handle, topic, onRegenerate, nextSteps, isGeneratingNextSteps }) => {
     const [editableSuggestions, setEditableSuggestions] = useState<PostSuggestion[]>([]);
-    const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [copiedStates, setCopiedStates] = useState<{ [key: string]: boolean }>({});
 
     useEffect(() => {
@@ -49,7 +51,7 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
         setEditableSuggestions(newSuggestions);
     };
     
-    const handleCopyToClipboard = (text: string, type: 'caption' | 'hashtags', index: number) => {
+    const handleCopyToClipboard = (text: string, type: string, index: number) => {
         navigator.clipboard.writeText(text);
         const key = `${type}-${index}`;
         setCopiedStates(prev => ({ ...prev, [key]: true }));
@@ -59,22 +61,29 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
     };
 
 
-    const handleShare = async (suggestion: PostSuggestion) => {
+    const handleShare = async (suggestion: PostSuggestion, index: number) => {
         const { caption, hashtags } = suggestion;
         const textToShare = `${caption}\n\n${hashtags.map(h => `#${h}`).join(' ')}`;
     
+        // Use Web Share API if available
         if (navigator.share) {
             try {
                 await navigator.share({
                     title: `Social post for ${platform}`,
                     text: textToShare,
                 });
-                return;
+                return; // Share was successful
             } catch (error) {
-                console.warn('Web Share API failed, falling back.', error);
+                // If user cancels the share, it throws an AbortError. In that case, we shouldn't fall back.
+                if (error instanceof DOMException && error.name === 'AbortError') {
+                    console.log('Share action was cancelled by the user.');
+                    return; 
+                }
+                console.warn('Web Share API failed, falling back to other methods.', error);
             }
         }
     
+        // Fallback logic for browsers that don't support Web Share API or if it fails
         const encodedText = encodeURIComponent(textToShare);
     
         switch (platform) {
@@ -82,15 +91,16 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
                 window.open(`https://twitter.com/intent/tweet?text=${encodedText}`, '_blank', 'noopener,noreferrer');
                 break;
             case Platform.Facebook:
-                 window.open(`https://www.facebook.com/sharer/sharer.php?u=https://example.com&quote=${encodedText}`, '_blank', 'noopener,noreferrer');
+                 // The 'u' parameter is required for the Facebook sharer. Using the brand website as a placeholder.
+                 window.open(`https://www.facebook.com/sharer/sharer.php?u=https://lemmaiot.com.ng&quote=${encodedText}`, '_blank', 'noopener,noreferrer');
                 break;
             case Platform.LinkedIn:
-                handleCopyToClipboard(textToShare, 'caption', -1);
+                handleCopyToClipboard(textToShare, 'share', index);
                 alert("Post content copied! We'll open LinkedIn for you to create a new post.");
                 window.open('https://www.linkedin.com/feed/?shareActive=true', '_blank', 'noopener,noreferrer');
                 break;
-            default:
-                handleCopyToClipboard(textToShare, 'caption', -1);
+            default: // For Instagram, TikTok, etc.
+                handleCopyToClipboard(textToShare, 'share', index);
                 alert(`Content for your ${platform} post has been copied! Open the app to create a new post.`);
                 break;
         }
@@ -101,22 +111,22 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
             <header className="text-center mb-8">
                 <h2 className="text-3xl font-bold text-gray-900">Here are your content ideas!</h2>
                 <p className="text-gray-600 mt-2">
-                    Generated for <span className="font-semibold text-brand-primary">{handle}</span> on <span className="font-semibold text-brand-primary">{platform}</span> about "{topic}"
+                    Generated for <span className="font-semibold text-brand-primary">{handle}</span> on the topic of "{topic}".
                 </p>
             </header>
-            
-            <div className="mb-8 p-4 bg-gray-50/80 rounded-lg border border-gray-200">
-                <p className="text-center text-sm font-medium text-gray-700 mb-3">Or, generate ideas for another platform:</p>
-                <div className="flex justify-center items-center gap-4">
+
+            <div className="mb-8 p-4 bg-gray-50/50 rounded-lg border border-gray-200">
+                <p className="text-center text-sm font-semibold text-gray-700 mb-3">Want ideas for another platform?</p>
+                <div className="flex justify-center items-center gap-3">
                     {platforms.map(p => (
-                        <button
+                        <button 
                             key={p.name}
                             onClick={() => onRegenerate(p.name)}
                             disabled={p.name === platform}
-                            className={`w-10 h-10 p-2 rounded-full transition-all duration-300 ${p.name === platform ? 'bg-brand-primary/20 ring-2 ring-brand-primary cursor-default' : 'bg-white hover:bg-gray-100 hover:scale-110 border border-gray-300'}`}
-                            aria-label={`Regenerate content for ${p.name}`}
+                            className={`w-12 h-12 flex items-center justify-center rounded-full border-2 transition-all duration-300 ${p.name === platform ? 'border-brand-primary bg-brand-primary/10' : `bg-white ${p.hoverColor} hover:-translate-y-1`} disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0`}
+                            aria-label={`Regenerate for ${p.name}`}
                         >
-                            <span className={p.color}>{p.icon}</span>
+                            <div className={`w-6 h-6 ${p.color}`}>{p.icon}</div>
                         </button>
                     ))}
                 </div>
@@ -125,90 +135,90 @@ const ResultsDisplay: React.FC<ResultsDisplayProps> = ({ suggestions, onReset, p
             <div className="flex items-start gap-3 bg-blue-50/70 border border-blue-200 text-blue-800 p-4 rounded-lg mb-8 text-sm">
                 <LightbulbIcon />
                 <div>
-                    <h4 className="font-bold mb-1">{platform} Best Practices</h4>
-                    <p>{postingTips[platform]}</p>
+                  <h4 className="font-bold mb-1">{platform} Best Practices</h4>
+                  <p>{postingTips[platform]}</p>
                 </div>
             </div>
 
 
             <div className="space-y-8">
-                {editableSuggestions.map((suggestion, index) => {
-                    const captionKey = `caption-${index}`;
-                    const hashtagsKey = `hashtags-${index}`;
-                    return (
-                        <div key={index} 
-                             className="bg-white/80 backdrop-blur-sm p-6 rounded-xl border border-gray-200 shadow-lg transition-shadow hover:shadow-2xl animate-fade-in-up"
-                             style={{ animationDelay: `${index * 150}ms`, opacity: 0 }}>
-                            <div className="mb-6">
-                                <h3 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-brand-primary to-brand-secondary mb-3">Caption Option {index + 1}</h3>
-                                <div className="relative bg-gray-50 p-4 rounded-md min-h-[100px] border border-gray-200">
-                                    {editingIndex === index ? (
-                                        <textarea
-                                            value={suggestion.caption}
-                                            onChange={(e) => handleCaptionChange(e, index)}
-                                            onBlur={() => setEditingIndex(null)}
-                                            className="w-full h-full bg-white text-gray-800 rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-brand-primary resize-y"
-                                            autoFocus
-                                            rows={5}
-                                        />
-                                    ) : (
-                                        <p onClick={() => setEditingIndex(index)} className="text-gray-700 whitespace-pre-wrap cursor-pointer p-2 rounded-md transition-colors">
-                                            {suggestion.caption}
-                                        </p>
-                                    )}
-                                    <button
-                                        onClick={() => handleCopyToClipboard(suggestion.caption, 'caption', index)}
-                                        className="absolute top-2 right-2 px-3 py-1 text-xs font-semibold text-white bg-brand-primary rounded-md hover:bg-opacity-80 transition-all"
-                                    >
-                                        {copiedStates[captionKey] ? 'Copied!' : 'Copy'}
-                                    </button>
-                                </div>
-                            </div>
-                            
-                            <div className="mb-6">
-                                 <h3 className="text-lg font-semibold text-gray-800 mb-2">Hashtags</h3>
-                                <div className="relative bg-gray-50 p-4 rounded-md border border-gray-200">
-                                    <p className="text-brand-primary/90 font-medium whitespace-pre-wrap leading-relaxed">
-                                        {suggestion.hashtags.map(tag => `#${tag}`).join(' ')}
-                                    </p>
-                                    <button
-                                        onClick={() => handleCopyToClipboard(suggestion.hashtags.map(h => `#${h}`).join(' '), 'hashtags', index)}
-                                        className="absolute top-2 right-2 px-3 py-1 text-xs font-semibold text-white bg-brand-primary rounded-md hover:bg-opacity-80 transition-all"
-                                    >
-                                        {copiedStates[hashtagsKey] ? 'Copied!' : 'Copy'}
-                                    </button>
-                                </div>
-                            </div>
+                {editableSuggestions.map((suggestion, index) => (
+                    <div key={index} className="bg-white/60 p-6 rounded-xl shadow-lg border border-gray-200">
+                        <div className="mb-4">
+                            <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider mb-2">Image Suggestion</h3>
+                            <p className="text-gray-800 italic">"{suggestion.imageSuggestion}"</p>
+                        </div>
 
-                            <div className="mb-6">
-                                <h3 className="text-lg font-semibold text-gray-800 mb-2">Image Suggestion</h3>
-                                <div className="p-4 bg-gray-50 rounded-md border border-gray-200">
-                                    <div className="flex items-start gap-3">
-                                        <svg className="w-6 h-6 text-brand-secondary flex-shrink-0 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                        <p className="text-gray-600 italic">{suggestion.imageSuggestion}</p>
-                                    </div>
-                                </div>
-                            </div>
+                        <div className="mb-4">
+                            <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider mb-2">Caption</h3>
+                            <textarea
+                                value={suggestion.caption}
+                                onChange={(e) => handleCaptionChange(e, index)}
+                                className="w-full p-3 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-brand-primary resize-y"
+                                rows={5}
+                                aria-label={`Caption for suggestion ${index + 1}`}
+                            />
+                        </div>
 
-                             <div>
-                                <button onClick={() => handleShare(suggestion)} className="w-full flex items-center justify-center gap-2 px-4 py-3 font-semibold text-white bg-gradient-to-r from-brand-primary to-brand-secondary rounded-lg hover:opacity-90 transition-opacity duration-300 shadow-lg">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M8.684 13.342C8.886 12.938 9 12.482 9 12s-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.368a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" /></svg>
-                                    Share Post Idea
-                                </button>
+                        <div className="mb-6">
+                            <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider mb-2">Hashtags</h3>
+                            <div className="flex flex-wrap gap-2">
+                                {suggestion.hashtags.map((tag, i) => (
+                                    <span key={i} className="px-3 py-1 bg-brand-primary/10 text-brand-primary text-sm font-medium rounded-full">#{tag}</span>
+                                ))}
                             </div>
                         </div>
-                    );
-                })}
+
+                        <div className="flex flex-wrap gap-3 items-center justify-end border-t pt-4 border-gray-200">
+                             <button
+                                onClick={() => handleCopyToClipboard(suggestion.caption, 'caption', index)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                            >
+                                {copiedStates[`caption-${index}`] ? 'Copied!' : 'Copy Caption'}
+                            </button>
+                             <button
+                                onClick={() => handleCopyToClipboard(suggestion.hashtags.map(h => `#${h}`).join(' '), 'hashtags', index)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors"
+                            >
+                                {copiedStates[`hashtags-${index}`] ? 'Copied!' : 'Copy Hashtags'}
+                            </button>
+                            <button
+                                onClick={() => handleShare(suggestion, index)}
+                                className="px-5 py-2 text-sm font-semibold text-white bg-brand-secondary rounded-md hover:bg-opacity-90 transition-colors"
+                            >
+                                Share
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+            <div className="mt-12">
+                <div className="flex items-center gap-3 mb-4">
+                    <TrendingUpIcon />
+                    <h3 className="text-2xl font-bold text-gray-900">What to Post Next?</h3>
+                </div>
+                 {isGeneratingNextSteps ? (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-gray-600">Generating follow-up ideas...</p>
+                    </div>
+                ) : nextSteps.length > 0 ? (
+                    <ul className="space-y-3 list-disc list-inside bg-white/60 p-6 rounded-xl shadow-lg border border-gray-200 text-gray-700">
+                        {nextSteps.map((step, i) => <li key={i}>{step}</li>)}
+                    </ul>
+                ) : (
+                    <div className="text-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <p className="text-gray-600">Could not generate follow-up ideas at this time.</p>
+                    </div>
+                )}
             </div>
 
             <div className="text-center mt-12">
                 <button
                     onClick={onReset}
-                    className="px-8 py-3 font-semibold text-white bg-brand-primary rounded-lg hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105"
+                    className="px-8 py-3 font-semibold text-white bg-brand-primary rounded-lg hover:bg-opacity-90 transition-colors duration-300 transform hover:scale-105"
                 >
-                    Start a New Post
+                    Start Over
                 </button>
             </div>
         </div>
